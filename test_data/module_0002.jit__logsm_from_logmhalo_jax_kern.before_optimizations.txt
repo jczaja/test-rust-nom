@@ -1,0 +1,37 @@
+HloModule jit__logsm_from_logmhalo_jax_kern, allow_spmd_sharding_propagation_to_output={true}
+
+ENTRY main.33 {
+  Arg_1.2 = f32[5]{0} parameter(1), sharding={replicated}
+  slice.5 = f32[1]{0} slice(Arg_1.2), slice={[0:1]}, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/dynamic_slice[slice_sizes=(1,)]" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=132}
+  reshape.6 = f32[] reshape(slice.5), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/squeeze[dimensions=(0,)]" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=132}
+  slice.7 = f32[1]{0} slice(Arg_1.2), slice={[1:2]}, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/dynamic_slice[slice_sizes=(1,)]" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=133}
+  reshape.8 = f32[] reshape(slice.7), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/squeeze[dimensions=(0,)]" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=133}
+  add.15 = f32[] add(reshape.6, reshape.8), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/add" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=137}
+  broadcast.31 = f32[500]{0} broadcast(add.15), dimensions={}, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/add" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=137}
+  slice.11 = f32[1]{0} slice(Arg_1.2), slice={[3:4]}, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/dynamic_slice[slice_sizes=(1,)]" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=135}
+  reshape.12 = f32[] reshape(slice.11), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/squeeze[dimensions=(0,)]" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=135}
+  broadcast.26 = f32[500]{0} broadcast(reshape.12), dimensions={}, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/add" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=137}
+  slice.13 = f32[1]{0} slice(Arg_1.2), slice={[4:5]}, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/dynamic_slice[slice_sizes=(1,)]" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=136}
+  reshape.14 = f32[] reshape(slice.13), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/squeeze[dimensions=(0,)]" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=136}
+  subtract.16 = f32[] subtract(reshape.14, reshape.12), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/sub" source_file="/home/jacekczaja/JAX/gordon/gordon/tests/test_gordon.py" source_line=17}
+  broadcast.24 = f32[500]{0} broadcast(subtract.16), dimensions={}, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/div" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=141}
+  slice.9 = f32[1]{0} slice(Arg_1.2), slice={[2:3]}, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/dynamic_slice[slice_sizes=(1,)]" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=134}
+  reshape.10 = f32[] reshape(slice.9), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/squeeze[dimensions=(0,)]" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=134}
+  negate.17 = f32[] negate(reshape.10), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/neg" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=140}
+  broadcast.20 = f32[500]{0} broadcast(negate.17), dimensions={}, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/mul" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=140}
+  Arg_0.1 = f32[500]{0} parameter(0), sharding={replicated}
+  broadcast.18 = f32[500]{0} broadcast(reshape.6), dimensions={}, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/sub" source_file="/home/jacekczaja/JAX/gordon/gordon/tests/test_gordon.py" source_line=17}
+  subtract.19 = f32[500]{0} subtract(Arg_0.1, broadcast.18), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/sub" source_file="/home/jacekczaja/JAX/gordon/gordon/tests/test_gordon.py" source_line=17}
+  multiply.21 = f32[500]{0} multiply(broadcast.20, subtract.19), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/mul" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=140}
+  exponential.22 = f32[500]{0} exponential(multiply.21), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/exp" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=140}
+  constant.3 = f32[] constant(1)
+  broadcast.4 = f32[500]{0} broadcast(constant.3), dimensions={}, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/add" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=140}
+  add.23 = f32[500]{0} add(exponential.22, broadcast.4), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/add" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=140}
+  divide.25 = f32[500]{0} divide(broadcast.24, add.23), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/div" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=141}
+  add.27 = f32[500]{0} add(broadcast.26, divide.25), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/add" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=137}
+  broadcast.28 = f32[500]{0} broadcast(reshape.6), dimensions={}, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/sub" source_file="/home/jacekczaja/JAX/gordon/gordon/tests/test_gordon.py" source_line=17}
+  subtract.29 = f32[500]{0} subtract(Arg_0.1, broadcast.28), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/sub" source_file="/home/jacekczaja/JAX/gordon/gordon/tests/test_gordon.py" source_line=17}
+  multiply.30 = f32[500]{0} multiply(add.27, subtract.29), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/mul" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=140}
+  ROOT add.32 = f32[500]{0} add(broadcast.31, multiply.30), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/add" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=137}
+}
+

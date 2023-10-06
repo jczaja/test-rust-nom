@@ -5,8 +5,6 @@
 // sharding={replicated??} check if I can gen info on sharded configuration
 // type od data and shape
 
-//TODO: make a vec of arguments to be returned
-
 use nom::{
     bytes::complete::is_a, bytes::complete::tag, bytes::complete::take_till,
     bytes::complete::take_until, bytes::complete::take_while, character::complete::digit1,
@@ -44,12 +42,23 @@ fn get_shape(input: &str) -> (&str, u32) {
     (s, shape)
 }
 
-fn get_type_shape_and_id(input: &str) -> Option<KernelArgument> {
-    let (s, argtype) = tag::<&str, &str, Error<_>>("f32")(input).expect("Error parsing type");
+fn get_type_shape_and_id(input: &str) -> (Option<(&str, KernelArgument)>) {
+    // TODO: make alternative of patterns
+    let maybe_type = take_until::<&str, &str, Error<&str>>("f32")(input);
+    let s = match maybe_type {
+        Ok((s, _)) => s,
+        Err(_) => return None,
+    };
+    let (s, arg_type) = tag::<&str, &str, Error<_>>("f32")(s).expect("Error parsing type");
     let (s, shape) = get_shape(s);
 
-    let (s, _) = take_until::<&str, &str, Error<&str>>("parameter")(s)
-        .expect("Error: No parameter in input!!");
+    // If no parameter then f32[500] was not in declaration
+    let maybe_parameter = take_until::<&str, &str, Error<&str>>("parameter")(s);
+    let s = match maybe_parameter {
+        Ok((s, _)) => s,
+        Err(_) => return None,
+    };
+
     let mut parse_id = delimited(
         tag::<&str, &str, Error<&str>>("parameter("),
         take_till(is_not_char_digit),
@@ -59,18 +68,15 @@ fn get_type_shape_and_id(input: &str) -> Option<KernelArgument> {
 
     let arg_id = str::parse::<u32>(k).expect("Error: converting to int failed");
 
-    // TODO: return remainder
-    match argtype {
-        "f32" => Some(KernelArgument::Typef32(shape, arg_id)),
-        _ => panic!("Error: Unsupported argument type: {argtype}"),
+    match arg_type {
+        "f32" => Some((s, KernelArgument::Typef32(shape, arg_id))),
+        _ => panic!("Error: Unsupported argument type: {arg_type}"),
     }
 }
 
 fn get_entry_block(input: &str) -> &str {
     let (s, _) =
-        take_until::<&str, &str, Error<&str>>("ENTRY")(input).expect("Error: No ENTRY in input!!");
-
-    // in a loop execute till end
+        take_until::<&str, &str, Error<&str>>("ENTRY")(input).expect("error: no ENTRY in input!!");
 
     let (s, _) =
         take_until::<&str, &str, Error<&str>>("{")(s).expect("Error: No parameter in input!!");
@@ -93,16 +99,18 @@ fn get_args_desc(input: &str) -> Vec<KernelArgument> {
     let mut arguments: Vec<KernelArgument> = vec![];
 
     let block = get_entry_block(input);
-
+    let mut s = block;
     loop {
-        let maybe_arg = get_type_shape_and_id(block);
-        match maybe_arg {
-            Some(arg_desc) => arguments.push(arg_desc),
+        let maybe_arg = get_type_shape_and_id(s);
+        s = match maybe_arg {
+            Some((s, arg_desc)) => {
+                arguments.push(arg_desc);
+                s
+            }
             None => break,
-        }
+        };
     }
 
-    //    println!("remainder: {s}");
     arguments
 }
 
@@ -134,8 +142,16 @@ mod tests {
     fn test_get_type_shape_and_id() -> Result<(), String> {
         assert_eq!(
             get_type_shape_and_id("f32[500]{0} parameter(0)"),
-            Some(KernelArgument::Typef32(500, 0))
+            Some(("", KernelArgument::Typef32(500, 0)))
         );
+        assert_eq!(
+            get_type_shape_and_id("Arg_0_1 =  f32[500]{0} parameter(0)"),
+            Some(("", KernelArgument::Typef32(500, 0)))
+        );
+        let input = r#"{
+  ROOT fusion = f32[500]{0} fusion(Arg_0.1, Arg_1.2), kind=kLoop, calls=fused_computation, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/add" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=137}
+"#;
+        assert_eq!(get_type_shape_and_id(input), None,);
         Ok(())
     }
 
@@ -167,6 +183,29 @@ something
 "#;
 
         assert_eq!(get_entry_block(input), expected_result);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_args_desc() -> Result<(), String> {
+        let input: &str = r#"
+  ROOT add.0 = f32[500]{0} add(broadcast.6, multiply.0), metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/add" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=137}
+}
+
+ENTRY main.33 {
+  Arg_0.1 = f32[500]{0} parameter(0), sharding={replicated}
+  Arg_1.2 = f32[5]{0} parameter(1), sharding={replicated}
+  ROOT fusion = f32[500]{0} fusion(Arg_0.1, Arg_1.2), kind=kLoop, calls=fused_computation, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/add" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=137}
+}
+something
+"#;
+
+        let expected_result: Vec<KernelArgument> = vec![
+            KernelArgument::Typef32(500, 0),
+            KernelArgument::Typef32(5, 1),
+        ];
+
+        assert_eq!(get_args_desc(input), expected_result);
         Ok(())
     }
 }

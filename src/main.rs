@@ -6,7 +6,7 @@
 // type od data and shape
 
 use nom::{
-    bytes::complete::is_a, bytes::complete::tag, bytes::complete::take_till,
+    bytes::complete::is_a, bytes::complete::tag, bytes::complete::take, bytes::complete::take_till,
     bytes::complete::take_until, bytes::complete::take_while, character::complete::digit1,
     character::is_alphabetic, character::is_digit, error::Error, sequence::delimited,
     sequence::tuple, IResult,
@@ -31,46 +31,70 @@ fn is_arg_type(input: &str) -> bool {
     is_a::<&str, &str, Error<&str>>("f32")(input).is_ok()
 }
 
-fn get_shape(input: &str) -> (&str, u32) {
-    let mut parse_shape = delimited(
-        tag::<&str, &str, Error<&str>>("["),
-        take_till(is_not_char_digit),
-        tag("]"),
-    );
-    let (s, shape_str) = parse_shape(input).expect("Error: parsing shape failed!");
-    let shape = str::parse::<u32>(shape_str).expect("Error: converting shape to int failed");
-    (s, shape)
-}
+fn get_type_shape_and_id(input: &str) -> Option<(&str, KernelArgument)> {
+    let mut s = input;
 
-fn get_type_shape_and_id(input: &str) -> (Option<(&str, KernelArgument)>) {
-    // TODO: make alternative of patterns
-    let maybe_type = take_until::<&str, &str, Error<&str>>("f32")(input);
-    let s = match maybe_type {
-        Ok((s, _)) => s,
-        Err(_) => return None,
-    };
-    let (s, arg_type) = tag::<&str, &str, Error<_>>("f32")(s).expect("Error parsing type");
-    let (s, shape) = get_shape(s);
+    // get next candidate str
 
-    // If no parameter then f32[500] was not in declaration
-    let maybe_parameter = take_until::<&str, &str, Error<&str>>("parameter")(s);
-    let s = match maybe_parameter {
-        Ok((s, _)) => s,
-        Err(_) => return None,
-    };
+    loop {
+        // TODO: make alternative of patterns
+        let scanner = take_until::<&str, &str, Error<&str>>("f32");
 
-    let mut parse_id = delimited(
-        tag::<&str, &str, Error<&str>>("parameter("),
-        take_till(is_not_char_digit),
-        tag(")"),
-    );
-    let (s, k) = parse_id(s).expect("Error: parsing arg Id failed!");
+        // Tuple of type[shape]{digits} parameter(id)
 
-    let arg_id = str::parse::<u32>(k).expect("Error: converting to int failed");
+        let type_parser = tag::<&str, &str, Error<_>>("f32");
 
-    match arg_type {
-        "f32" => Some((s, KernelArgument::Typef32(shape, arg_id))),
-        _ => panic!("Error: Unsupported argument type: {arg_type}"),
+        let shape_parser = delimited(
+            tag::<&str, &str, Error<&str>>("["),
+            take_till(is_not_char_digit),
+            tag("]"),
+        );
+
+        let braced_parser = delimited(
+            tag::<&str, &str, Error<&str>>("{"),
+            take_till(is_not_char_digit),
+            tag("}"),
+        );
+
+        let parameter_parser = delimited(
+            tag::<&str, &str, Error<&str>>("parameter("),
+            take_till(is_not_char_digit),
+            tag(")"),
+        );
+
+        let result = scanner(s);
+        s = match result {
+            Ok((s, _)) => s,
+            Err(_) => return None,
+        };
+
+        // matching example: "f32[100]{0} parameter(0)"
+        let result = tuple((
+            &type_parser,
+            shape_parser,
+            braced_parser,
+            take(1usize),
+            parameter_parser,
+        ))(s);
+
+        match result {
+            Ok((s, (arg_type, shape_str, _, _, id_str))) => {
+                let shape =
+                    str::parse::<u32>(shape_str).expect("Error: converting shape to int failed");
+
+                let arg_id = str::parse::<u32>(id_str).expect("Error: converting to int failed");
+
+                let a = match arg_type {
+                    "f32" => Some((s, KernelArgument::Typef32(shape, arg_id))),
+                    _ => panic!("Error: Unsupported argument type: {arg_type}"),
+                };
+                return a;
+            }
+            Err(_) => {
+                let (remainder, _) = type_parser(s).expect("Error: parsing type");
+                s = remainder;
+            }
+        }
     }
 }
 
@@ -116,16 +140,15 @@ fn get_args_desc(input: &str) -> Vec<KernelArgument> {
 
 fn main() {
     println!("Hello Rust Parsers world!");
-    assert_eq!(parser("Kupa Hello, World!"), Ok((", World!", "Hello")));
 
     let input = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/test_data/module_0002.jit__logsm_from_logmhalo_jax_kern.before_optimizations.txt"
     ));
 
-    get_args_desc(input);
+    let args_desc = get_args_desc(input);
 
-    //    assert!();
+    println!("Kernel arguments: {:?}", args_desc);
 }
 
 #[cfg(test)]
@@ -151,14 +174,7 @@ mod tests {
         let input = r#"{
   ROOT fusion = f32[500]{0} fusion(Arg_0.1, Arg_1.2), kind=kLoop, calls=fused_computation, metadata={op_name="jit(_logsm_from_logmhalo_jax_kern)/jit(main)/add" source_file="/home/jacekczaja/JAX/gordon/gordon/sigmoid_smhm.py" source_line=137}
 "#;
-        assert_eq!(get_type_shape_and_id(input), None,);
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_shape() -> Result<(), String> {
-        assert_eq!(get_shape("[500]"), ("", 500));
-        assert_eq!(get_shape("[44]{0}"), ("{0}", 44));
+        assert_eq!(get_type_shape_and_id(input), None);
         Ok(())
     }
 
@@ -206,6 +222,39 @@ something
         ];
 
         assert_eq!(get_args_desc(input), expected_result);
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_nonoptimized_hlo() -> Result<(), String> {
+        let input = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/test_data/module_0002.jit__logsm_from_logmhalo_jax_kern.before_optimizations.txt"
+        ));
+
+        let expected_result: Vec<KernelArgument> = vec![
+            KernelArgument::Typef32(5, 1),
+            KernelArgument::Typef32(500, 0),
+        ];
+
+        assert_eq!(get_args_desc(input), expected_result);
+
+        Ok(())
+    }
+    #[test]
+    fn test_parse_optimized_hlo() -> Result<(), String> {
+        let input = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/test_data/module_0002.jit__logsm_from_logmhalo_jax_kern.gpu_after_optimizations.txt"
+        ));
+
+        let expected_result: Vec<KernelArgument> = vec![
+            KernelArgument::Typef32(500, 0),
+            KernelArgument::Typef32(5, 1),
+        ];
+
+        assert_eq!(get_args_desc(input), expected_result);
+
         Ok(())
     }
 }
